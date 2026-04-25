@@ -113,6 +113,78 @@ Geocoding is done at startup (not per user request) because:
 If geocoding fails for a lot, that lot is still included in results but distance calculation
 is skipped for it.
 
+### API Details
+
+**Endpoint:** `GET https://maps.googleapis.com/maps/api/geocode/json`
+
+**Required parameters:**
+- `address` — the Hebrew address string
+- `region=il` — biases results toward Israel; prevents ambiguous Hebrew names resolving elsewhere
+- `language=iw` — returns Hebrew in the formatted address (useful for logging)
+- `key` — API key, loaded from the `GOOGLE_MAPS_API_KEY` environment variable
+
+**HTTP stack:** `requests` + `certifi` (stdlib `urllib` has macOS SSL issues with Hebrew URLs)
+
+```python
+import requests
+import certifi
+
+GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+
+def geocode(address: str, api_key: str) -> tuple[float, float] | None:
+    """
+    Returns (lat, lng) for the given address, or None if geocoding fails.
+    """
+    params = {
+        "address": address,
+        "region": "il",
+        "language": "iw",
+        "key": api_key,
+    }
+    resp = requests.get(GEOCODING_URL, params=params, timeout=10, verify=certifi.where())
+    resp.raise_for_status()
+    data = resp.json()
+
+    if data.get("status") != "OK" or not data.get("results"):
+        return None
+
+    loc = data["results"][0]["geometry"]["location"]
+    return loc["lat"], loc["lng"]
+```
+
+### Tested Address Formats
+
+Both address formats used in this app were tested and confirmed to geocode successfully:
+
+**Lot addresses** (scraped from ahuzot.co.il, passed through `region=il`):
+```
+אשתורי הפרחי 5 תל-אביב יפו
+הירקון 2 תל-אביב יפו
+הרברט סמואל 40 תל-אביב יפו
+דיזנגוף 68 תל-אביב יפו
+אלנבי 90 תל-אביב יפו
+רוטשילד 1 תל-אביב יפו
+```
+
+**User-submitted addresses** (free-form input from the search box):
+```
+בן יהודה 50, תל אביב
+שוק הכרמל
+שדרות רוטשילד 22
+פלורנטין, תל אביב
+```
+
+Landmark and neighborhood inputs (no street number) resolve successfully, though with
+`location_type: APPROXIMATE` rather than `ROOFTOP`. This is acceptable for distance ranking.
+
+### Sanity Check
+
+Results should fall within the Tel Aviv metro bounding box:
+- Latitude: 31.95 – 32.20
+- Longitude: 34.70 – 34.90
+
+Log a warning for any lot that geocodes outside this range.
+
 ---
 
 ## Per-Request Flow
@@ -178,7 +250,6 @@ The server should not accept user requests until startup is complete.
 
 The following will be added to this document once tested and confirmed:
 
-- Google Maps Geocoding API integration (pending API key setup and testing)
 - Frontend component structure
 - Waze / Google Maps navigation deep links
 - Deployment setup
