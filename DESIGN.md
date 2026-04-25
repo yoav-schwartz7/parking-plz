@@ -177,6 +177,57 @@ Both address formats used in this app were tested and confirmed to geocode succe
 Landmark and neighborhood inputs (no street number) resolve successfully, though with
 `location_type: APPROXIMATE` rather than `ROOFTOP`. This is acceptable for distance ranking.
 
+### Coordinate Caching (Cost Control)
+
+Geocoding 87 lots costs ~$0.43 per server restart (87 requests × $5/1,000). To avoid
+paying this on every restart, lot coordinates are persisted to a local file after the
+first successful geocoding run.
+
+**File:** `lot_coordinates.json` in the project root
+**Format:** a flat dict mapping lot name → `{lat, lng}`
+
+```json
+{
+  "בזל": { "lat": 32.0853, "lng": 34.7818 },
+  "הירקון": { "lat": 32.0891, "lng": 34.7732 },
+  ...
+}
+```
+
+**Startup logic:**
+
+```python
+COORDS_CACHE_FILE = "lot_coordinates.json"
+
+def load_or_geocode_coordinates(lots: dict, api_key: str, force_refresh: bool = False) -> dict:
+    if not force_refresh and os.path.exists(COORDS_CACHE_FILE):
+        with open(COORDS_CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)  # skip all 87 API calls
+
+    # Cache miss or forced refresh — geocode everything
+    coords = {}
+    for name, lot in lots.items():
+        result = geocode(lot["address"], api_key)
+        if result:
+            coords[name] = {"lat": result[0], "lng": result[1]}
+
+    with open(COORDS_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(coords, f, ensure_ascii=False, indent=2)
+
+    return coords
+```
+
+**To force a refresh** (e.g. after lot addresses change), restart the server with:
+
+```bash
+python main.py --refresh-coords
+```
+
+Or simply delete `lot_coordinates.json` and restart normally.
+
+`lot_coordinates.json` should be added to `.gitignore` — it is a local cache, not
+source-controlled data.
+
 ### Sanity Check
 
 Results should fall within the Tel Aviv metro bounding box:
@@ -236,12 +287,16 @@ GET /api/parking?address=<user address string>
 Server starts
   → Scrape /Parking/All (1 request) → 87 lots with names + addresses
   → Scrape each detail page (87 requests, sequential) → tariff image URLs
-  → Geocode each address via Google Maps API (87 requests) → coordinates
-  → Store everything in memory as static lookup dict
+  → Load lot_coordinates.json if it exists  ← skip geocoding on warm restarts
+      → if missing or --refresh-coords flag: geocode all 87 addresses → save to file
+  → Merge coordinates into static lookup dict
   → Server is ready to accept requests
 ```
 
-Estimated startup time: ~2-3 minutes (dominated by the 87 sequential scrape requests).
+Estimated startup time:
+- **Warm restart** (coordinates cached): ~2-3 minutes (dominated by the 87 scrape requests)
+- **Cold start / refresh** (no cache): ~3-4 minutes (scrape + 87 geocoding requests)
+
 The server should not accept user requests until startup is complete.
 
 ---
