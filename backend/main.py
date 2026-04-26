@@ -1,17 +1,18 @@
 import argparse
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 
-from geocoding import load_or_geocode_coordinates
+from geocoding import geocode, load_or_geocode_coordinates
 from parking import fetch_live_availability, find_nearest_lots
 from scraper import scrape_all_lots
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,18 +30,29 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-_refresh_coords: bool = False
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Runs the startup sequence before the server accepts requests:
-      1. Scrape static lot data from ahuzot.co.il
-      2. Load or geocode lot coordinates
-      3. Merge coordinates into static lookup and store on app.state
-    """
-    ...
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        logger.error("GOOGLE_MAPS_API_KEY environment variable is not set")
+        sys.exit(1)
+
+    refresh_coords = getattr(app.state, "refresh_coords", False)
+
+    logger.info("Scraping static lot data from ahuzot.co.il...")
+    lots = scrape_all_lots()
+    logger.info("Scraped %d lots", len(lots))
+
+    coords = load_or_geocode_coordinates(lots, api_key, force_refresh=refresh_coords)
+
+    for name, c in coords.items():
+        if name in lots:
+            lots[name]["coordinates"] = c
+
+    app.state.static_lots = lots
+    app.state.api_key = api_key
+    logger.info("Startup complete — server ready")
+
     yield
 
 
@@ -54,21 +66,46 @@ async def health() -> dict[str, str]:
 
 @app.get("/api/parking")
 async def get_parking(
-    address: str = Query(..., description="User's address in Hebrew or English"),
+    request: Request,
+    address: str | None = Query(None, description="Address to geocode (Hebrew or English)"),
+    lat: float | None = Query(None, ge=-90, le=90, description="User latitude"),
+    lng: float | None = Query(None, ge=-180, le=180, description="User longitude"),
     top_n: int = Query(5, ge=1, le=87, description="Number of nearest lots to return"),
 ) -> list[dict[str, Any]]:
-    """
-    Geocodes the user's address, fetches live availability, and returns the
-    top_n nearest parking lots sorted by distance.
-    """
-    ...
+    # Validate input: exactly one of (address) or (lat + lng)
+    has_address = address is not None
+    has_coords = lat is not None and lng is not None
+    has_partial_coords = (lat is None) != (lng is None)
+
+    if has_partial_coords:
+        raise HTTPException(status_code=400, detail="Provide both lat and lng, or neither")
+    if has_address and has_coords:
+        raise HTTPException(status_code=400, detail="Provide either address or lat/lng, not both")
+    if not has_address and not has_coords:
+        raise HTTPException(status_code=400, detail="Provide either address or lat+lng")
+
+    if has_address:
+        result = geocode(address, request.app.state.api_key)
+        if result is None:
+            raise HTTPException(status_code=400, detail=f"Could not geocode address: {address}")
+        user_lat, user_lng = result
+    else:
+        user_lat, user_lng = lat, lng
+
+    try:
+        live_data = fetch_live_availability()
+    except Exception as e:
+        logger.warning("Live API unavailable (%s) — returning lots with unknown availability", e)
+        live_data = []
+
+    return find_nearest_lots(user_lat, user_lng, request.app.state.static_lots, live_data, top_n)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    _refresh_coords = args.refresh_coords
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    app.state.refresh_coords = args.refresh_coords
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
