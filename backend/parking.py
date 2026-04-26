@@ -1,7 +1,10 @@
+import logging
 import math
 from typing import Any
 
 from thefuzz import process
+
+logger = logging.getLogger(__name__)
 
 LIVE_API_URL = "https://api.tel-aviv.gov.il/parking/StationsStatus"
 FUZZY_THRESHOLD = 80

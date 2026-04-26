@@ -1,7 +1,10 @@
 import argparse
+import logging
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
@@ -17,6 +20,11 @@ def parse_args() -> argparse.Namespace:
         "--refresh-coords",
         action="store_true",
         help="Force re-geocode all lot addresses, ignoring the local cache",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable DEBUG-level logging across all modules",
     )
     return parser.parse_args()
 
@@ -59,4 +67,8 @@ async def get_parking(
 if __name__ == "__main__":
     args = parse_args()
     _refresh_coords = args.refresh_coords
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

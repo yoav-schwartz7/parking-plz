@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 
 import certifi
 import requests
+
+logger = logging.getLogger(__name__)
 
 GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 COORDS_CACHE_FILE = "lot_coordinates.json"
