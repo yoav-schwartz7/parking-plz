@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { fetchParkingLots } from './api'
-import type { ParkingLot } from './api'
+import type { LatLng, ParkingLot } from './api'
 import { SearchBar } from './components/SearchBar'
 import { LotList } from './components/LotList'
 import { FilterBar } from './components/FilterBar'
-import type { DisplayCount } from './components/FilterBar'
+import { MapView } from './components/MapView'
+import type { DisplayCount, ViewMode } from './components/FilterBar'
 
 export default function App() {
   const [allResults, setAllResults] = useState<ParkingLot[]>([])
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [showAvailableOnly, setShowAvailableOnly] = useState(false)
   const [displayCount, setDisplayCount] = useState<DisplayCount>(5)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   const handleSearch = async (params: { address: string } | { lat: number; lng: number }) => {
     setLoading(true)
@@ -20,10 +23,12 @@ export default function App() {
     setSearched(true)
     try {
       const data = await fetchParkingLots(params)
-      setAllResults(data)
+      setAllResults(data.lots)
+      setUserLocation(data.user_location)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setAllResults([])
+      setUserLocation(null)
     } finally {
       setLoading(false)
     }
@@ -65,8 +70,14 @@ export default function App() {
                 onShowAvailableOnlyChange={setShowAvailableOnly}
                 totalCount={allResults.length}
                 filteredCount={filtered.length}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
               />
-              <LotList lots={displayed} />
+              {viewMode === 'list' ? (
+                <LotList lots={displayed} />
+              ) : (
+                userLocation && <MapView lots={displayed} userLocation={userLocation} />
+              )}
             </>
           )}
         </div>

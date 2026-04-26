@@ -8,11 +8,21 @@ export interface ParkingLot {
   coordinates: { lat: number; lng: number } | null
 }
 
+export interface LatLng {
+  lat: number
+  lng: number
+}
+
+export interface ParkingResponse {
+  user_location: LatLng
+  lots: ParkingLot[]
+}
+
 type SearchParams =
   | { address: string }
   | { lat: number; lng: number }
 
-export async function fetchParkingLots(params: SearchParams): Promise<ParkingLot[]> {
+export async function fetchParkingLots(params: SearchParams): Promise<ParkingResponse> {
   const qs = new URLSearchParams()
 
   if ('address' in params) {

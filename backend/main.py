@@ -71,7 +71,7 @@ async def get_parking(
     lat: float | None = Query(None, ge=-90, le=90, description="User latitude"),
     lng: float | None = Query(None, ge=-180, le=180, description="User longitude"),
     top_n: int = Query(5, ge=1, le=87, description="Number of nearest lots to return"),
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     # Validate input: exactly one of (address) or (lat + lng)
     has_address = address is not None
     has_coords = lat is not None and lng is not None
@@ -98,7 +98,11 @@ async def get_parking(
         logger.warning("Live API unavailable (%s) — returning lots with unknown availability", e)
         live_data = []
 
-    return find_nearest_lots(user_lat, user_lng, request.app.state.static_lots, live_data, top_n)
+    lots = find_nearest_lots(user_lat, user_lng, request.app.state.static_lots, live_data, top_n)
+    return {
+        "user_location": {"lat": user_lat, "lng": user_lng},
+        "lots": lots,
+    }
 
 
 if __name__ == "__main__":
