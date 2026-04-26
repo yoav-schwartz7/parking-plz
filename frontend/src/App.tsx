@@ -44,7 +44,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="mb-2 flex items-center gap-3">
-          <img src="/parking-plz-icon.png" alt="Parking PLZ" className="h-11 w-11 object-contain" />
+          <img src="/parking-plz-animated.gif" alt="Parking PLZ" className="h-11 w-11 object-contain" />
           <h1 className="text-3xl font-bold text-gray-900">Parking PLZ</h1>
         </div>
         <p className="mb-6 text-sm text-gray-500">Find the nearest Ahuzat HaHof parking lots in Tel Aviv</p>
