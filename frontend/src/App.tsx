@@ -43,48 +43,62 @@ export default function App() {
 
   return (
     <AuthGate>
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <div className="mb-2 flex items-center gap-3">
-          <img src="/parking-plz-animated.gif" alt="Parking PLZ" className="h-11 w-11 object-contain" />
-          <h1 className="text-3xl font-bold text-gray-900">Parking PLZ</h1>
-        </div>
-        <p className="mb-6 text-sm text-gray-500">Find the nearest Ahuzat HaHof parking lots in Tel Aviv</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="mx-auto max-w-2xl px-4 py-10">
 
-        <SearchBar onSearch={handleSearch} loading={loading} />
+          {/* Header */}
+          <div className="mb-8">
+            <div className="mb-1 flex items-center gap-3">
+              <img src="/parking-plz-animated.gif" alt="Parking PLZ" className="h-12 w-12 object-contain drop-shadow-sm" />
+              <h1 className="text-4xl font-bold tracking-tight text-gray-900">Parking PLZ</h1>
+            </div>
+            <p className="ml-1 text-sm text-gray-500">Find the nearest Ahuzat HaHof parking lots in Tel Aviv</p>
+          </div>
 
-        <div className="mt-6">
-          {loading && (
-            <p className="text-center text-sm text-gray-500">Searching for nearby lots...</p>
-          )}
-          {!loading && error && (
-            <p className="text-center text-sm text-red-600">{error}</p>
-          )}
-          {!loading && !error && searched && allResults.length === 0 && (
-            <p className="text-center text-sm text-gray-500">No lots found.</p>
-          )}
-          {!loading && allResults.length > 0 && (
-            <>
-              <FilterBar
-                displayCount={displayCount}
-                onDisplayCountChange={setDisplayCount}
-                showAvailableOnly={showAvailableOnly}
-                onShowAvailableOnlyChange={setShowAvailableOnly}
-                totalCount={allResults.length}
-                filteredCount={filtered.length}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-              {viewMode === 'list' ? (
-                <LotList lots={displayed} />
-              ) : (
-                userLocation && <MapView lots={displayed} userLocation={userLocation} />
-              )}
-            </>
-          )}
+          {/* Search card */}
+          <div className="mb-6 rounded-2xl border border-white/80 bg-white/90 p-5 shadow-md backdrop-blur-sm">
+            <SearchBar onSearch={handleSearch} loading={loading} />
+          </div>
+
+          {/* Results */}
+          <div>
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
+                Searching for nearby lots...
+              </div>
+            )}
+            {!loading && error && (
+              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-600">
+                {error}
+              </div>
+            )}
+            {!loading && !error && searched && allResults.length === 0 && (
+              <p className="py-10 text-center text-sm text-gray-400">No lots found.</p>
+            )}
+            {!loading && allResults.length > 0 && (
+              <>
+                <FilterBar
+                  displayCount={displayCount}
+                  onDisplayCountChange={setDisplayCount}
+                  showAvailableOnly={showAvailableOnly}
+                  onShowAvailableOnlyChange={setShowAvailableOnly}
+                  totalCount={allResults.length}
+                  filteredCount={filtered.length}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                />
+                {viewMode === 'list' ? (
+                  <LotList lots={displayed} />
+                ) : (
+                  userLocation && <MapView lots={displayed} userLocation={userLocation} />
+                )}
+              </>
+            )}
+          </div>
+
         </div>
       </div>
-    </div>
     </AuthGate>
   )
 }

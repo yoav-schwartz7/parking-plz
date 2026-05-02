@@ -35,12 +35,12 @@ export function SearchBar({ onSearch, loading }: SearchBarProps) {
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Enter an address in Tel Aviv..."
           disabled={loading}
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
+          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={loading || !address.trim()}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-40"
         >
           Search
         </button>
@@ -50,12 +50,12 @@ export function SearchBar({ onSearch, loading }: SearchBarProps) {
         type="button"
         onClick={handleGeolocate}
         disabled={loading}
-        className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 active:scale-95 disabled:opacity-50"
       >
         <span>📍</span> Use my location
       </button>
 
-      {geoError && <p className="text-sm text-red-600">{geoError}</p>}
+      {geoError && <p className="text-xs text-red-500">{geoError}</p>}
     </div>
   )
 }
