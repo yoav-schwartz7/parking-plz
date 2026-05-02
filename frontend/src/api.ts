@@ -20,6 +20,7 @@ export interface LatLng {
 export interface ParkingResponse {
   user_location: LatLng
   lots: ParkingLot[]
+  live_api_available: boolean
 }
 
 type SearchParams =

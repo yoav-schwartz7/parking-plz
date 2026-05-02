@@ -149,16 +149,19 @@ async def get_parking(
     else:
         user_lat, user_lng = lat, lng
 
+    live_api_available = True
     try:
         live_data = fetch_live_availability()
     except Exception as e:
         logger.warning("Live API unavailable (%s) — returning lots with unknown availability", e)
         live_data = []
+        live_api_available = False
 
     lots = find_nearest_lots(user_lat, user_lng, request.app.state.static_lots, live_data, top_n)
     return {
         "user_location": {"lat": user_lat, "lng": user_lng},
         "lots": lots,
+        "live_api_available": live_api_available,
     }
 
 

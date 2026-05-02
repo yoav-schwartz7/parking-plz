@@ -15,6 +15,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [showAvailableOnly, setShowAvailableOnly] = useState(false)
+  const [liveApiAvailable, setLiveApiAvailable] = useState(true)
   const [displayCount, setDisplayCount] = useState<DisplayCount>(5)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
@@ -26,6 +27,7 @@ export default function App() {
       const data = await fetchParkingLots(params)
       setAllResults(data.lots)
       setUserLocation(data.user_location)
+      setLiveApiAvailable(data.live_api_available)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setAllResults([])
@@ -75,6 +77,11 @@ export default function App() {
             )}
             {!loading && !error && searched && allResults.length === 0 && (
               <p className="py-10 text-center text-sm text-gray-400">No lots found.</p>
+            )}
+            {!loading && !liveApiAvailable && (
+              <p className="mb-3 text-center text-xs text-red-500">
+                Live availability data is temporarily unavailable. Try again in a few seconds.
+              </p>
             )}
             {!loading && allResults.length > 0 && (
               <>
