@@ -3,16 +3,39 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import jwt
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
 from geocoding import geocode, load_or_geocode_coordinates
 from parking import fetch_live_availability, find_nearest_lots
 from scraper import scrape_all_lots
 
 logger = logging.getLogger(__name__)
+security = HTTPBearer(auto_error=False)
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+def require_auth(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> None:
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        jwt.decode(credentials.credentials, request.app.state.jwt_secret, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,8 +56,16 @@ def parse_args() -> argparse.Namespace:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
-    if not api_key:
-        logger.error("GOOGLE_MAPS_API_KEY environment variable is not set")
+    access_password = os.environ.get("ACCESS_PASSWORD")
+    jwt_secret = os.environ.get("JWT_SECRET")
+
+    missing = [k for k, v in {
+        "GOOGLE_MAPS_API_KEY": api_key,
+        "ACCESS_PASSWORD": access_password,
+        "JWT_SECRET": jwt_secret,
+    }.items() if not v]
+    if missing:
+        logger.error("Missing required environment variables: %s", ", ".join(missing))
         sys.exit(1)
 
     refresh_coords = getattr(app.state, "refresh_coords", False)
@@ -51,6 +82,8 @@ async def lifespan(app: FastAPI):
 
     app.state.static_lots = lots
     app.state.api_key = api_key
+    app.state.access_password = access_password
+    app.state.jwt_secret = jwt_secret
     logger.info("Startup complete — server ready")
 
     yield
@@ -64,6 +97,18 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/auth/login")
+async def login(body: LoginRequest, request: Request) -> dict[str, str]:
+    if body.password != request.app.state.access_password:
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    token = jwt.encode(
+        {"exp": datetime.now(timezone.utc) + timedelta(days=7)},
+        request.app.state.jwt_secret,
+        algorithm="HS256",
+    )
+    return {"token": token}
+
+
 @app.get("/api/parking")
 async def get_parking(
     request: Request,
@@ -71,8 +116,8 @@ async def get_parking(
     lat: float | None = Query(None, ge=-90, le=90, description="User latitude"),
     lng: float | None = Query(None, ge=-180, le=180, description="User longitude"),
     top_n: int = Query(5, ge=1, le=87, description="Number of nearest lots to return"),
+    _: None = Depends(require_auth),
 ) -> dict[str, Any]:
-    # Validate input: exactly one of (address) or (lat + lng)
     has_address = address is not None
     has_coords = lat is not None and lng is not None
     has_partial_coords = (lat is None) != (lng is None)

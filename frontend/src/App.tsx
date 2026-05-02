@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { fetchParkingLots } from './api'
 import type { LatLng, ParkingLot } from './api'
+import { AuthGate } from './components/AuthGate'
 import { SearchBar } from './components/SearchBar'
 import { LotList } from './components/LotList'
 import { FilterBar } from './components/FilterBar'
@@ -41,6 +42,7 @@ export default function App() {
   const displayed = displayCount === 'all' ? filtered : filtered.slice(0, displayCount)
 
   return (
+    <AuthGate>
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="mb-2 flex items-center gap-3">
@@ -83,5 +85,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </AuthGate>
   )
 }

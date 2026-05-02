@@ -1,3 +1,5 @@
+import { clearToken, getToken } from './auth'
+
 export interface ParkingLot {
   name: string
   address: string | null
@@ -33,7 +35,15 @@ export async function fetchParkingLots(params: SearchParams): Promise<ParkingRes
   }
   qs.set('top_n', '87')
 
-  const resp = await fetch(`/api/parking?${qs}`)
+  const resp = await fetch(`/api/parking?${qs}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+
+  if (resp.status === 401) {
+    clearToken()
+    window.location.reload()
+    throw new Error('Session expired')
+  }
   if (!resp.ok) {
     const body = await resp.json().catch(() => null)
     throw new Error(body?.detail ?? `Request failed (${resp.status})`)
