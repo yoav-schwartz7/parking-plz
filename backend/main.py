@@ -58,11 +58,13 @@ async def lifespan(app: FastAPI):
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
     access_password = os.environ.get("ACCESS_PASSWORD")
     jwt_secret = os.environ.get("JWT_SECRET")
+    redis_url = os.environ.get("REDIS_URL")
 
     missing = [k for k, v in {
         "GOOGLE_MAPS_API_KEY": api_key,
         "ACCESS_PASSWORD": access_password,
         "JWT_SECRET": jwt_secret,
+        "REDIS_URL": redis_url,
     }.items() if not v]
     if missing:
         logger.error("Missing required environment variables: %s", ", ".join(missing))
@@ -74,7 +76,7 @@ async def lifespan(app: FastAPI):
     lots = scrape_all_lots()
     logger.info("Scraped %d lots", len(lots))
 
-    coords = load_or_geocode_coordinates(lots, api_key, force_refresh=refresh_coords)
+    coords = load_or_geocode_coordinates(lots, api_key, redis_url, force_refresh=refresh_coords)
 
     for name, c in coords.items():
         if name in lots:

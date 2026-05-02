@@ -4,12 +4,13 @@ import os
 import sys
 
 import certifi
+import redis
 import requests
 
 logger = logging.getLogger(__name__)
 
 GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
-COORDS_CACHE_FILE = "lot_coordinates.json"
+REDIS_COORDS_KEY = "lot_coordinates"
 
 # Tel Aviv metro bounding box for sanity checks
 TA_LAT_MIN, TA_LAT_MAX = 31.95, 32.20
@@ -48,18 +49,25 @@ def geocode(address: str, api_key: str) -> tuple[float, float] | None:
 def load_or_geocode_coordinates(
     lots: dict[str, dict],
     api_key: str,
+    redis_url: str,
     force_refresh: bool = False,
 ) -> dict[str, dict]:
     """
     Returns a dict mapping lot name → {"lat": float, "lng": float}.
 
-    If COORDS_CACHE_FILE exists and force_refresh is False, loads from file.
-    Otherwise geocodes every lot's address and saves the result to COORDS_CACHE_FILE.
+    Checks Redis for a cached result first. If found and force_refresh is False,
+    returns the cached value. Otherwise geocodes all lots and stores the result in Redis.
     """
-    if not force_refresh and os.path.exists(COORDS_CACHE_FILE):
-        logger.info("Loading coordinates from cache (%s)", COORDS_CACHE_FILE)
-        with open(COORDS_CACHE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+    client = redis.from_url(redis_url, ssl_cert_reqs=None)
+
+    if not force_refresh:
+        cached = client.get(REDIS_COORDS_KEY)
+        if cached:
+            logger.info("Loading coordinates from Redis cache")
+            return json.loads(cached)
+
+    if force_refresh:
+        client.delete(REDIS_COORDS_KEY)
 
     logger.info("Geocoding %d lots...", len(lots))
     coords = {}
@@ -72,9 +80,8 @@ def load_or_geocode_coordinates(
         else:
             logger.warning("[%d/%d] %s → geocoding failed, skipping", i, total, name)
 
-    with open(COORDS_CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(coords, f, ensure_ascii=False, indent=2)
-    logger.info("Saved coordinates for %d/%d lots to %s", len(coords), total, COORDS_CACHE_FILE)
+    client.set(REDIS_COORDS_KEY, json.dumps(coords, ensure_ascii=False))
+    logger.info("Saved coordinates for %d/%d lots to Redis", len(coords), total)
 
     return coords
 
@@ -86,14 +93,18 @@ if __name__ == "__main__":
     )
 
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    redis_url = os.environ.get("REDIS_URL")
     if not api_key:
         logger.error("GOOGLE_MAPS_API_KEY environment variable is not set")
+        sys.exit(1)
+    if not redis_url:
+        logger.error("REDIS_URL environment variable is not set")
         sys.exit(1)
 
     from scraper import scrape_all_lots
 
     lots = scrape_all_lots()
-    coords = load_or_geocode_coordinates(lots, api_key)
+    coords = load_or_geocode_coordinates(lots, api_key, redis_url)
 
     print(f"\nTotal lots geocoded: {len(coords)}/{len(lots)}")
     print("\nSample (first 5):")
