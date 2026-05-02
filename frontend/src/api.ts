@@ -1,5 +1,7 @@
 import { clearToken, getToken } from './auth'
 
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 export interface ParkingLot {
   name: string
   address: string | null
@@ -24,6 +26,17 @@ type SearchParams =
   | { address: string }
   | { lat: number; lng: number }
 
+export async function login(password: string): Promise<string> {
+  const resp = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!resp.ok) throw new Error('Incorrect password')
+  const data = await resp.json()
+  return data.token
+}
+
 export async function fetchParkingLots(params: SearchParams): Promise<ParkingResponse> {
   const qs = new URLSearchParams()
 
@@ -35,7 +48,7 @@ export async function fetchParkingLots(params: SearchParams): Promise<ParkingRes
   }
   qs.set('top_n', '87')
 
-  const resp = await fetch(`/api/parking?${qs}`, {
+  const resp = await fetch(`${API_BASE}/api/parking?${qs}`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   })
 

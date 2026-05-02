@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { login } from '../api'
 import { getToken, setToken } from '../auth'
 
 interface AuthGateProps {
@@ -16,20 +17,11 @@ export function AuthGate({ children }: AuthGateProps) {
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      if (!resp.ok) {
-        setError('Incorrect password')
-        return
-      }
-      const data = await resp.json()
-      setToken(data.token)
+      const token = await login(password)
+      setToken(token)
       setAuthenticated(true)
-    } catch {
-      setError('Could not reach the server. Try again.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reach the server. Try again.')
     } finally {
       setLoading(false)
     }
