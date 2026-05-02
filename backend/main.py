@@ -102,7 +102,7 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
@@ -140,6 +140,8 @@ async def get_parking(
         raise HTTPException(status_code=400, detail="Provide either address or lat+lng")
 
     if has_address:
+        if "תל אביב" not in address:
+            address = f"{address}, תל אביב"
         result = geocode(address, request.app.state.api_key)
         if result is None:
             raise HTTPException(status_code=400, detail=f"Could not geocode address: {address}")
